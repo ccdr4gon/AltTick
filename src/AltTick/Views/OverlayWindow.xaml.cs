@@ -58,13 +58,11 @@ public partial class OverlayWindow : Window
         // Position before showing using raw monitor info (no DPI conversion needed pre-show)
         PositionOnScreen();
 
+        RootPanel.Opacity = 1;
         Show();
-        UpdateLayout(); // Force layout so TranslatePoint works for DWM thumbnail positioning
+        UpdateLayout();
         RegisterDwmThumbnails();
         UpdateSelection();
-
-        var fadeIn = (Storyboard)FindResource("FadeIn");
-        fadeIn.Begin();
     }
 
     public void CycleSelection(bool reverse)
@@ -105,6 +103,27 @@ public partial class OverlayWindow : Window
         UnregisterDwmThumbnails();
         RootPanel.Opacity = 0;
         Hide();
+    }
+
+    private void OnFadeInCompleted(object? sender, EventArgs e)
+    {
+        if (sender is Storyboard sb)
+            sb.Completed -= OnFadeInCompleted;
+        SetDwmThumbnailsOpacity(255);
+    }
+
+    private void SetDwmThumbnailsOpacity(byte opacity)
+    {
+        foreach (var thumbId in _thumbnailIds)
+        {
+            if (thumbId == IntPtr.Zero) continue;
+            var props = new DWM_THUMBNAIL_PROPERTIES
+            {
+                dwFlags = NativeConstants.DWM_TNP_OPACITY,
+                opacity = opacity,
+            };
+            NativeMethods.DwmUpdateThumbnailProperties(thumbId, ref props);
+        }
     }
 
     private void UpdateAppHeader()
@@ -301,7 +320,7 @@ public partial class OverlayWindow : Window
         Top = monY + (monH - totalHeight) / 2;
     }
 
-    private void RegisterDwmThumbnails()
+    private void RegisterDwmThumbnails(byte opacity = 255)
     {
         UnregisterDwmThumbnails();
 
@@ -356,7 +375,7 @@ public partial class OverlayWindow : Window
             {
                 dwFlags = NativeConstants.DWM_TNP_VISIBLE | NativeConstants.DWM_TNP_RECTDESTINATION | NativeConstants.DWM_TNP_OPACITY,
                 fVisible = true,
-                opacity = 255,
+                opacity = opacity,
                 rcDestination = new RECT
                 {
                     Left = left,
