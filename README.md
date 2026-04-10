@@ -8,14 +8,14 @@
 
 <a id="english"></a>
 
-**Alt+`** window switcher for Windows — switch between windows of the same application, just like macOS.
+**Alt+\`** window switcher for Windows — switch between windows of the same application, just like macOS.
 
 ![.NET 8](https://img.shields.io/badge/.NET-8.0-blue)
 ![Windows](https://img.shields.io/badge/platform-Windows-lightgrey)
 
 ## Features
 
-- **Alt+`** to switch between windows of the same application
+- **Alt+\`** to switch between windows of the same application
 - **Live DWM thumbnails** preview for all same-app windows
 - **Mouse click** to select a window directly
 - **Shift+`** to cycle in reverse
@@ -74,11 +74,11 @@ MIT
 
 <a id="中文"></a>
 
-Windows 下的 **Alt+`** 同应用窗口切换器，类似 macOS 的 Alt+` 功能。
+Windows 下的 **Alt+\`** 同应用窗口切换器，类似 macOS 的 Alt+\` 功能。
 
 ## 功能
 
-- **Alt+`** 在同一应用的不同窗口之间切换
+- **Alt+\`** 在同一应用的不同窗口之间切换
 - **DWM 实时缩略图** 预览所有同应用窗口
 - **鼠标点击** 直接选择窗口
 - **Shift+`** 反向切换
