@@ -4,6 +4,9 @@ obj/
 publish/
 publish-small/
 publish-trimmed/
+publish-portable/
+publish-self-contained/
+publish-compressed/
 
 ## IDE & tools
 .vs/
