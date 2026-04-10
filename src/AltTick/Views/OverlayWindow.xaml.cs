@@ -17,10 +17,11 @@ public partial class OverlayWindow : Window
     private List<AppWindow> _windows = [];
     private int _selectedIndex;
     private int _hoverIndex = -1;
+    private bool _isRemoving;
     private IntPtr _overlayHwnd;
 
     public event EventHandler? WindowClicked;
-    public event EventHandler<int>? WindowCloseRequested;
+    public event EventHandler<IntPtr>? WindowCloseRequested;
 
     private const int ThumbWidth = 240;
     private const int ThumbHeight = 160;
@@ -45,11 +46,14 @@ public partial class OverlayWindow : Window
 
     public void ShowWithWindows(List<AppWindow> windows)
     {
-        if (windows.Count <= 1)
+        if (windows.Count == 0)
             return;
 
+        // Clear any leftover animation holds on Width
+        BeginAnimation(WidthProperty, null);
+
         _windows = windows;
-        _selectedIndex = 1; // Start at second window (first is the current foreground)
+        _selectedIndex = windows.Count > 1 ? 1 : 0;
         _hoverIndex = -1;
 
         UpdateAppHeader();
@@ -105,25 +109,66 @@ public partial class OverlayWindow : Window
         Hide();
     }
 
-    private void OnFadeInCompleted(object? sender, EventArgs e)
+    public void RemoveWindowAt(int index, Action<List<AppWindow>>? onComplete = null)
     {
-        if (sender is Storyboard sb)
-            sb.Completed -= OnFadeInCompleted;
-        SetDwmThumbnailsOpacity(255);
-    }
+        if (_isRemoving || index < 0 || index >= _windows.Count) return;
+        _isRemoving = true;
 
-    private void SetDwmThumbnailsOpacity(byte opacity)
-    {
-        foreach (var thumbId in _thumbnailIds)
+        // Unregister all DWM thumbnails before animating
+        UnregisterDwmThumbnails();
+
+        var removedBorder = _thumbnailBorders[index];
+
+        // Animate only the removed card: width + margin collapse to 0
+        var widthAnim = new DoubleAnimation
         {
-            if (thumbId == IntPtr.Zero) continue;
-            var props = new DWM_THUMBNAIL_PROPERTIES
+            To = 0,
+            Duration = TimeSpan.FromMilliseconds(150),
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut },
+            FillBehavior = FillBehavior.Stop,
+        };
+
+        widthAnim.Completed += (_, _) =>
+        {
+            // Clear animation hold
+            removedBorder.BeginAnimation(WidthProperty, null);
+
+            // Remove from lists
+            _windows.RemoveAt(index);
+            _thumbnailBorders.RemoveAt(index);
+            _thumbnailPlaceholders.RemoveAt(index);
+            ThumbnailContainer.Items.RemoveAt(index);
+
+            // Fix selected index
+            if (_windows.Count == 0)
             {
-                dwFlags = NativeConstants.DWM_TNP_OPACITY,
-                opacity = opacity,
-            };
-            NativeMethods.DwmUpdateThumbnailProperties(thumbId, ref props);
-        }
+                _selectedIndex = -1;
+            }
+            else if (_selectedIndex >= _windows.Count)
+            {
+                _selectedIndex = _windows.Count - 1;
+            }
+
+            // Resize overlay directly (no animation) and re-register thumbnails
+            if (_windows.Count > 0)
+            {
+                int cols = Math.Min(_windows.Count, MaxColumns);
+                int rows = (int)Math.Ceiling((double)_windows.Count / MaxColumns);
+                Width = cols * (ThumbWidth + 8 + ThumbSpacing) + 40;
+                Height = rows * (ThumbHeight + 58 + ThumbSpacing) + 80;
+
+                UpdateLayout();
+                RegisterDwmThumbnails();
+                UpdateSelection();
+            }
+
+            _isRemoving = false;
+            onComplete?.Invoke(_windows);
+        };
+
+        // Also collapse margin so remaining items slide together
+        removedBorder.Margin = new Thickness(0);
+        removedBorder.BeginAnimation(WidthProperty, widthAnim);
     }
 
     private void UpdateAppHeader()
@@ -239,11 +284,11 @@ public partial class OverlayWindow : Window
                 ((TextBlock)closeBtn.Child).Foreground = new SolidColorBrush(Color.FromArgb(180, 255, 255, 255));
             };
 
-            int capturedIndex = index;
+            var capturedHandle = win.Handle;
             closeBtn.MouseLeftButtonDown += (_, e) =>
             {
-                e.Handled = true; // don't trigger window click
-                WindowCloseRequested?.Invoke(this, capturedIndex);
+                e.Handled = true;
+                WindowCloseRequested?.Invoke(this, capturedHandle);
             };
 
             grid.Children.Add(closeBtn);

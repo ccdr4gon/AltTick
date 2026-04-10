@@ -114,7 +114,7 @@ public partial class App : Application
             _originalForeground = Interop.NativeMethods.GetForegroundWindow();
             var windows = WindowEnumerationService.GetWindowsForSameApp(_originalForeground);
 
-            if (windows.Count <= 1)
+            if (windows.Count == 0)
             {
                 _cycleActive = false;
                 return;
@@ -162,32 +162,23 @@ public partial class App : Application
         _overlay?.HideImmediately();
     }
 
-    private void OnWindowCloseRequested(object? sender, int windowIndex)
+    private void OnWindowCloseRequested(object? sender, IntPtr windowHandle)
     {
         if (_overlay == null) return;
 
         var windows = _overlay.GetWindows();
-        if (windowIndex < 0 || windowIndex >= windows.Count) return;
+        int windowIndex = windows.FindIndex(w => w.Handle == windowHandle);
+        if (windowIndex < 0) return;
 
         windows[windowIndex].Close();
 
-        // Refresh the overlay with remaining windows
-        System.Threading.Tasks.Task.Delay(200).ContinueWith(_ =>
+        _overlay.RemoveWindowAt(windowIndex, remaining =>
         {
-            Dispatcher.BeginInvoke(() =>
+            if (remaining.Count == 0)
             {
-                var refreshed = WindowEnumerationService.GetWindowsForSameApp(_originalForeground);
-                if (refreshed.Count <= 1)
-                {
-                    _cycleActive = false;
-                    _overlay.HideImmediately();
-                }
-                else
-                {
-                    _overlay.HideImmediately();
-                    _overlay.ShowWithWindows(refreshed);
-                }
-            });
+                _cycleActive = false;
+                _overlay.HideImmediately();
+            }
         });
     }
 

@@ -120,10 +120,13 @@ internal sealed class KeyboardHookService : IDisposable
                 if (IsAltKey(vk) && isKeyUp)
                 {
                     _state = HookState.Idle;
+                    _backtickHeld = false;
                     if (_backtickPressedDuringAlt)
                     {
                         CycleCommitted?.Invoke(this, EventArgs.Empty);
-                        return true; // suppress Alt release to prevent system menu
+                        // Don't suppress Alt release - let Windows see it
+                        // to avoid "stuck Alt" state
+                        return false;
                     }
                     return false;
                 }

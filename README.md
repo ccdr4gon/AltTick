@@ -17,13 +17,12 @@
 
 - **Alt+\`** to switch between windows of the same application
 - **Live DWM thumbnails** preview for all same-app windows
-- **Mouse click** to select a window directly
-- **Shift+`** to cycle in reverse
-- **Escape** to cancel
-- **System tray** with right-click menu (startup toggle, exit, etc.)
+- **Mouse click** to select, **hover** to highlight
+- **Close windows** directly from the switcher via X button (with shrink animation)
+- **Shift+\`** to cycle in reverse, **Escape** to cancel
+- **System tray** with right-click menu (startup toggle, about, exit)
 - Supports UWP and Win32 apps
-- Single instance enforcement
-- PerMonitorV2 DPI awareness
+- Single instance, PerMonitorV2 DPI aware
 
 ## Download
 
@@ -80,13 +79,12 @@ Windows 下的 **Alt+\`** 同应用窗口切换器，类似 macOS 的 Alt+\` 功
 
 - **Alt+\`** 在同一应用的不同窗口之间切换
 - **DWM 实时缩略图** 预览所有同应用窗口
-- **鼠标点击** 直接选择窗口
-- **Shift+`** 反向切换
-- **Escape** 取消切换
-- **系统托盘** 右键菜单管理（开机启动、退出等）
+- **鼠标点击** 选择窗口，**悬停** 高亮预览
+- **关闭窗口** 点击缩略图右上角 X 直接关闭（带收缩动画）
+- **Shift+\`** 反向切换，**Escape** 取消
+- **系统托盘** 右键菜单管理（开机启动、关于、退出）
 - 支持 UWP / Win32 应用
-- 单实例运行
-- PerMonitorV2 DPI 感知
+- 单实例运行，PerMonitorV2 DPI 感知
 
 ## 下载
 
