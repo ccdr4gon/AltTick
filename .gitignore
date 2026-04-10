@@ -1,0 +1,19 @@
+## .NET
+bin/
+obj/
+publish/
+publish-small/
+publish-trimmed/
+
+## IDE & tools
+.vs/
+.vscode/
+.claude/
+*.user
+*.suo
+*.DotSettings.user
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store
