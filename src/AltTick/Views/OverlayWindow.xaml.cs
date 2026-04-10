@@ -13,11 +13,14 @@ public partial class OverlayWindow : Window
 {
     private readonly List<IntPtr> _thumbnailIds = [];
     private readonly List<Border> _thumbnailBorders = [];
+    private readonly List<Border> _thumbnailPlaceholders = [];
     private List<AppWindow> _windows = [];
     private int _selectedIndex;
+    private int _hoverIndex = -1;
     private IntPtr _overlayHwnd;
 
     public event EventHandler? WindowClicked;
+    public event EventHandler<int>? WindowCloseRequested;
 
     private const int ThumbWidth = 240;
     private const int ThumbHeight = 160;
@@ -47,6 +50,7 @@ public partial class OverlayWindow : Window
 
         _windows = windows;
         _selectedIndex = 1; // Start at second window (first is the current foreground)
+        _hoverIndex = -1;
 
         UpdateAppHeader();
         CreateThumbnailSlots();
@@ -75,6 +79,8 @@ public partial class OverlayWindow : Window
         UpdateSelection();
     }
 
+    public List<AppWindow> GetWindows() => _windows;
+
     public AppWindow? GetSelectedWindow()
     {
         if (_selectedIndex >= 0 && _selectedIndex < _windows.Count)
@@ -97,6 +103,7 @@ public partial class OverlayWindow : Window
     public void HideImmediately()
     {
         UnregisterDwmThumbnails();
+        RootPanel.Opacity = 0;
         Hide();
     }
 
@@ -113,6 +120,7 @@ public partial class OverlayWindow : Window
     {
         ThumbnailContainer.Items.Clear();
         _thumbnailBorders.Clear();
+        _thumbnailPlaceholders.Clear();
 
         foreach (var win in _windows)
         {
@@ -120,7 +128,7 @@ public partial class OverlayWindow : Window
             var border = new Border
             {
                 Width = ThumbWidth + 8,
-                Height = ThumbHeight + 40,
+                Height = ThumbHeight + 58, // +22 for close button area, +36 for title+padding
                 Margin = new Thickness(ThumbSpacing / 2.0),
                 CornerRadius = new CornerRadius(8),
                 Background = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)),
@@ -132,28 +140,38 @@ public partial class OverlayWindow : Window
 
             border.MouseEnter += (_, _) =>
             {
-                _selectedIndex = index;
+                _hoverIndex = index;
                 UpdateSelection();
             };
 
-            border.MouseLeftButtonDown += (_, _) =>
+            border.MouseLeave += (_, _) =>
+            {
+                _hoverIndex = -1;
+                UpdateSelection();
+            };
+
+            border.MouseLeftButtonDown += (_, e) =>
             {
                 _selectedIndex = index;
                 WindowClicked?.Invoke(this, EventArgs.Empty);
+                e.Handled = true;
             };
+
+            // Use Grid so close button can overlay on top-right
+            var grid = new Grid();
 
             var stack = new StackPanel();
 
-            // Placeholder for DWM thumbnail (the DWM renders directly over this area)
+            // Placeholder for DWM thumbnail (top margin leaves room for close button)
             var thumbPlaceholder = new Border
             {
-                Width = ThumbWidth,
                 Height = ThumbHeight,
-                Margin = new Thickness(4, 4, 4, 4),
+                Margin = new Thickness(4, 22, 4, 4),
                 Background = new SolidColorBrush(Color.FromArgb(30, 0, 0, 0)),
                 CornerRadius = new CornerRadius(4),
             };
             stack.Children.Add(thumbPlaceholder);
+            _thumbnailPlaceholders.Add(thumbPlaceholder);
 
             // Window title
             var title = new TextBlock
@@ -167,8 +185,50 @@ public partial class OverlayWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Center,
             };
             stack.Children.Add(title);
+            grid.Children.Add(stack);
 
-            border.Child = stack;
+            // Close button (top-right)
+            var closeBtn = new Border
+            {
+                Width = 20,
+                Height = 20,
+                CornerRadius = new CornerRadius(10),
+                Background = new SolidColorBrush(Color.FromArgb(0, 200, 50, 50)),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 2, 2, 0),
+                Cursor = Cursors.Hand,
+                Child = new TextBlock
+                {
+                    Text = "\u00D7",
+                    Foreground = new SolidColorBrush(Color.FromArgb(180, 255, 255, 255)),
+                    FontSize = 14,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, -2, 0, 0),
+                },
+            };
+
+            closeBtn.MouseEnter += (_, _) =>
+            {
+                closeBtn.Background = new SolidColorBrush(Color.FromRgb(200, 50, 50));
+                ((TextBlock)closeBtn.Child).Foreground = Brushes.White;
+            };
+            closeBtn.MouseLeave += (_, _) =>
+            {
+                closeBtn.Background = new SolidColorBrush(Color.FromArgb(0, 200, 50, 50));
+                ((TextBlock)closeBtn.Child).Foreground = new SolidColorBrush(Color.FromArgb(180, 255, 255, 255));
+            };
+
+            int capturedIndex = index;
+            closeBtn.MouseLeftButtonDown += (_, e) =>
+            {
+                e.Handled = true; // don't trigger window click
+                WindowCloseRequested?.Invoke(this, capturedIndex);
+            };
+
+            grid.Children.Add(closeBtn);
+            border.Child = grid;
             ThumbnailContainer.Items.Add(border);
             _thumbnailBorders.Add(border);
         }
@@ -178,12 +238,26 @@ public partial class OverlayWindow : Window
     {
         for (int i = 0; i < _thumbnailBorders.Count; i++)
         {
-            _thumbnailBorders[i].BorderBrush = i == _selectedIndex
-                ? new SolidColorBrush(Color.FromRgb(0, 120, 212)) // Windows accent blue
-                : Brushes.Transparent;
-            _thumbnailBorders[i].Background = i == _selectedIndex
-                ? new SolidColorBrush(Color.FromArgb(100, 0, 120, 212))
-                : new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
+            bool isSelected = i == _selectedIndex;
+            bool isHovered = i == _hoverIndex;
+
+            if (isSelected)
+            {
+                // Keyboard selection: accent blue border + tinted background
+                _thumbnailBorders[i].BorderBrush = new SolidColorBrush(Color.FromRgb(0, 120, 212));
+                _thumbnailBorders[i].Background = new SolidColorBrush(Color.FromArgb(100, 0, 120, 212));
+            }
+            else if (isHovered)
+            {
+                // Mouse hover: subtle lighten, no border
+                _thumbnailBorders[i].BorderBrush = Brushes.Transparent;
+                _thumbnailBorders[i].Background = new SolidColorBrush(Color.FromArgb(100, 255, 255, 255));
+            }
+            else
+            {
+                _thumbnailBorders[i].BorderBrush = Brushes.Transparent;
+                _thumbnailBorders[i].Background = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
+            }
         }
     }
 
@@ -194,7 +268,7 @@ public partial class OverlayWindow : Window
         int rows = (int)Math.Ceiling((double)count / MaxColumns);
 
         double totalWidth = cols * (ThumbWidth + 8 + ThumbSpacing) + 40;
-        double totalHeight = rows * (ThumbHeight + 40 + ThumbSpacing) + 80;
+        double totalHeight = rows * (ThumbHeight + 58 + ThumbSpacing) + 80;
 
         Width = totalWidth;
         Height = totalHeight;
@@ -248,27 +322,35 @@ public partial class OverlayWindow : Window
             // Get source size
             NativeMethods.DwmQueryThumbnailSourceSize(thumbId, out var srcSize);
 
-            // Calculate destination rect (in device pixels)
-            var border = _thumbnailBorders[i];
-            var pos = border.TranslatePoint(new Point(4, 4), this);
+            // Get exact placeholder position from the element itself
+            var placeholder = _thumbnailPlaceholders[i];
+            var pos = placeholder.TranslatePoint(new Point(0, 0), this);
 
-            // Get DPI scale factor
             var source = PresentationSource.FromVisual(this);
             double dpiScaleX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
             double dpiScaleY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
 
-            // Scale to fit within ThumbWidth x ThumbHeight maintaining aspect ratio
-            double scaleX = (double)ThumbWidth / srcSize.cx;
-            double scaleY = (double)ThumbHeight / srcSize.cy;
+            // Placeholder rect in device pixels
+            int areaW = (int)Math.Round(placeholder.ActualWidth * dpiScaleX);
+            int areaH = (int)Math.Round(placeholder.ActualHeight * dpiScaleY);
+            int areaLeft = (int)Math.Round(pos.X * dpiScaleX);
+            int areaTop = (int)Math.Round(pos.Y * dpiScaleY);
+
+            // Scale source to fit within placeholder, maintaining aspect ratio
+            double scaleX = (double)areaW / srcSize.cx;
+            double scaleY = (double)areaH / srcSize.cy;
             double scale = Math.Min(scaleX, scaleY);
+            if (scale > 1) scale = 1;
 
-            int destW = (int)(srcSize.cx * scale);
-            int destH = (int)(srcSize.cy * scale);
-            int offsetX = (ThumbWidth - destW) / 2;
-            int offsetY = (ThumbHeight - destH) / 2;
+            int destW = (int)Math.Round(srcSize.cx * scale);
+            int destH = (int)Math.Round(srcSize.cy * scale);
 
-            int left = (int)((pos.X + 4 + offsetX) * dpiScaleX);
-            int top = (int)((pos.Y + 4 + offsetY) * dpiScaleY);
+            // Clamp to not exceed placeholder area
+            destW = Math.Min(destW, areaW);
+            destH = Math.Min(destH, areaH);
+
+            int left = areaLeft + (areaW - destW) / 2;
+            int top = areaTop + (areaH - destH) / 2;
 
             var props = new DWM_THUMBNAIL_PROPERTIES
             {
@@ -279,8 +361,8 @@ public partial class OverlayWindow : Window
                 {
                     Left = left,
                     Top = top,
-                    Right = left + (int)(destW * dpiScaleX),
-                    Bottom = top + (int)(destH * dpiScaleY),
+                    Right = left + destW,
+                    Bottom = top + destH,
                 },
             };
 

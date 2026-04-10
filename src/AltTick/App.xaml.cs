@@ -17,6 +17,7 @@ public partial class App : Application
     private OverlayWindow? _overlay;
     private TaskbarIcon? _trayIcon;
     private IntPtr _originalForeground;
+    private bool _cycleActive;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -35,6 +36,7 @@ public partial class App : Application
 
         _overlay = new OverlayWindow();
         _overlay.WindowClicked += OnWindowClicked;
+        _overlay.WindowCloseRequested += OnWindowCloseRequested;
 
         SetupTrayIcon();
         SetupKeyboardHook();
@@ -113,8 +115,12 @@ public partial class App : Application
             var windows = WindowEnumerationService.GetWindowsForSameApp(_originalForeground);
 
             if (windows.Count <= 1)
+            {
+                _cycleActive = false;
                 return;
+            }
 
+            _cycleActive = true;
             _overlay?.ShowWithWindows(windows);
         });
     }
@@ -123,7 +129,8 @@ public partial class App : Application
     {
         Dispatcher.BeginInvoke(() =>
         {
-            _overlay?.CycleSelection(e.Reverse);
+            if (_cycleActive)
+                _overlay?.CycleSelection(e.Reverse);
         });
     }
 
@@ -131,9 +138,9 @@ public partial class App : Application
     {
         Dispatcher.BeginInvoke(() =>
         {
+            if (!_cycleActive) return;
+            _cycleActive = false;
             var selectedWindow = _overlay?.GetSelectedWindow();
-            // Activate FIRST while overlay still covers the screen, then hide overlay.
-            // This avoids the flicker caused by focus bouncing to the original window.
             selectedWindow?.Activate();
             _overlay?.HideImmediately();
         });
@@ -143,6 +150,7 @@ public partial class App : Application
     {
         Dispatcher.BeginInvoke(() =>
         {
+            _cycleActive = false;
             _overlay?.HideImmediately();
         });
     }
@@ -152,6 +160,35 @@ public partial class App : Application
         var selectedWindow = _overlay?.GetSelectedWindow();
         selectedWindow?.Activate();
         _overlay?.HideImmediately();
+    }
+
+    private void OnWindowCloseRequested(object? sender, int windowIndex)
+    {
+        if (_overlay == null) return;
+
+        var windows = _overlay.GetWindows();
+        if (windowIndex < 0 || windowIndex >= windows.Count) return;
+
+        windows[windowIndex].Close();
+
+        // Refresh the overlay with remaining windows
+        System.Threading.Tasks.Task.Delay(200).ContinueWith(_ =>
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                var refreshed = WindowEnumerationService.GetWindowsForSameApp(_originalForeground);
+                if (refreshed.Count <= 1)
+                {
+                    _cycleActive = false;
+                    _overlay.HideImmediately();
+                }
+                else
+                {
+                    _overlay.HideImmediately();
+                    _overlay.ShowWithWindows(refreshed);
+                }
+            });
+        });
     }
 
     private static System.Drawing.Icon CreateTrayIcon()

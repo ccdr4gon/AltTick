@@ -95,6 +95,10 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     internal static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr lpdwProcessId);
 
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool PostMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+
     // User32 - Icons
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     internal static extern IntPtr SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);

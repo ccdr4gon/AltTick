@@ -1,5 +1,7 @@
 # AltTick
 
+![AltTick showcase](showcase.gif)
+
 [English](#english) | [中文](#中文)
 
 ---

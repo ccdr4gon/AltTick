@@ -83,4 +83,9 @@ public class AppWindow
         NativeMethods.SetForegroundWindow(Handle);
         NativeMethods.keybd_event((byte)NativeConstants.VK_MENU, 0, NativeConstants.KEYEVENTF_KEYUP, 0);
     }
+
+    public void Close()
+    {
+        NativeMethods.PostMessage(Handle, NativeConstants.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+    }
 }

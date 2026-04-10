@@ -23,6 +23,7 @@ internal sealed class KeyboardHookService : IDisposable
     private readonly NativeMethods.LowLevelKeyboardProc _proc;
     private HookState _state = HookState.Idle;
     private bool _backtickPressedDuringAlt;
+    private bool _backtickHeld;
 
     public event EventHandler? CycleStarted;
     public event EventHandler<CycleEventArgs>? CycleNext;
@@ -86,6 +87,7 @@ internal sealed class KeyboardHookService : IDisposable
                 {
                     _state = HookState.AltHeld;
                     _backtickPressedDuringAlt = false;
+                    _backtickHeld = false;
                     return false; // don't suppress Alt itself
                 }
                 break;
@@ -99,10 +101,11 @@ internal sealed class KeyboardHookService : IDisposable
                 if (vk == NativeConstants.VK_OEM_3 && isKeyDown)
                 {
                     _backtickPressedDuringAlt = true;
-                    bool shift = IsShiftDown();
+                    _backtickHeld = true;
                     _state = HookState.Cycling;
+                    // ShowWithWindows already selects index 1 (the next window),
+                    // so don't fire CycleNext on the first backtick press.
                     CycleStarted?.Invoke(this, EventArgs.Empty);
-                    CycleNext?.Invoke(this, new CycleEventArgs(shift));
                     return true; // suppress backtick
                 }
                 if (!IsAltKey(vk) && !IsShiftKey(vk) && vk != NativeConstants.VK_OEM_3)
@@ -124,8 +127,17 @@ internal sealed class KeyboardHookService : IDisposable
                     }
                     return false;
                 }
+                if (vk == NativeConstants.VK_OEM_3 && isKeyUp)
+                {
+                    _backtickHeld = false;
+                    return true; // suppress backtick release
+                }
                 if (vk == NativeConstants.VK_OEM_3 && isKeyDown)
                 {
+                    if (_backtickHeld)
+                        return true; // suppress key-repeat while held down
+
+                    _backtickHeld = true;
                     bool shift = IsShiftDown();
                     CycleNext?.Invoke(this, new CycleEventArgs(shift));
                     return true; // suppress backtick

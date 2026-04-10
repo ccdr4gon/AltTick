@@ -39,6 +39,7 @@ internal static class NativeConstants
     public const int GW_OWNER = 4;
 
     // Window Messages
+    public const int WM_CLOSE = 0x0010;
     public const int WM_GETICON = 0x007F;
     public const int ICON_SMALL = 0;
     public const int ICON_BIG = 1;
