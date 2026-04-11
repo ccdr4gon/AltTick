@@ -55,6 +55,8 @@ dotnet publish src/AltTick -c Release -r win-x64 --no-self-contained -p:PublishS
 dotnet publish src/AltTick -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
 ```
 
+> **Note:** Do not compress the self-contained exe with external tools (UPX, 7-Zip SFX, etc.) — this will break the .NET single-file bundle. Built-in compression is already applied.
+
 ## Tech Stack
 
 - C# / .NET 8 / WPF
@@ -116,6 +118,8 @@ dotnet publish src/AltTick -c Release -r win-x64 --no-self-contained -p:PublishS
 # 发布自包含版（~66MB，无需安装运行时）
 dotnet publish src/AltTick -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
 ```
+
+> **注意：** 不要用外部工具（UPX、7-Zip 自解压等）压缩自包含 exe，会破坏 .NET 单文件结构。已内置压缩。
 
 ## 技术栈
 
